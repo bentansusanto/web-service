@@ -76,7 +76,6 @@ export const Me = async({response, cookies}: RouterContext<any>) => {
     
     const payload = await verify(jwt, key, "HS512");
 
-
     if(!payload) {
         response.body = 401;
         response.body = {
