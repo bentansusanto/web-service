@@ -1,6 +1,6 @@
 import { Router } from 'https://deno.land/x/oak@v11.1.0/mod.ts';
-import { Register, Login, Me, Logout } from './controllers/UserController.ts';
-import { getCustomer, getCustomerById, createCustomer, updateCustomer, deleteCustomer } from './controllers/CustomerController.ts';
+import { Register, Login, Me, Logout } from './src/controllers/UserController.ts';
+import { getCustomer, getCustomerById, createCustomer, updateCustomer, deleteCustomer } from './src/controllers/CustomerController.ts';
 
 export const router = new Router()
 // User
