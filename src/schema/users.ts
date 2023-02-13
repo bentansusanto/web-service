@@ -1,7 +1,7 @@
 export interface UserSchema {
     _id : {$oid :string},
-    firstName : string,
-    lastName : string,
+    name : string,
+    username : string,
     email : string,
     password : string,
 }

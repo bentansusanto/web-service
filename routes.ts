@@ -1,12 +1,13 @@
 import { Router } from 'https://deno.land/x/oak@v11.1.0/mod.ts';
-import { Register, Login, Logout } from './src/controllers/UserController.ts';
+import { Register, Login, Logout, Profile } from './src/controllers/UserController.ts';
 import { getCustomer, getCustomerById, createCustomer, updateCustomer, deleteCustomer } from './src/controllers/CustomerController.ts';
+// import { Profile } from './src/controllers/UserController';
 
 export const router = new Router()
 // User
 router.post('/api/register', Register)
       .post('/api/login', Login)
-      // .get('/api/me', Me)
+      .get('/api/user', Profile)
       .post('/api/logout', Logout)
 
 // Product

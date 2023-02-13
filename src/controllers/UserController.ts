@@ -2,102 +2,106 @@
 import { RouterContext } from "https://deno.land/x/oak@v11.1.0/mod.ts";
 import * as bcrypt from "https://deno.land/x/bcrypt@v0.3.0/mod.ts";
 import { db } from '../database/connection.ts';
-// import { Bson } from "https://deno.land/x/mongo@v0.28.0/mod.ts";
-import { create, verify } from "https://deno.land/x/djwt@v2.7/mod.ts";
+import { Bson } from "https://deno.land/x/mongo@v0.28.0/mod.ts";
+import { create, verify, getNumericDate } from 'https://deno.land/x/djwt@v2.2/mod.ts';
 import { UserSchema } from "../schema/users.ts";
-
 
 const users = db.collection<UserSchema>("users")
 
-// deno-lint-ignore no-explicit-any
-export const Register = async ({request, response} : RouterContext<any>) => {
-    const {firstName, lastName, email, password} = await request.body().value;
-    const hashPassword = await bcrypt.hash(password)
-    const insertId = await users.insertOne({
-        // _id : Math.random().toString(),
-        firstName,
-        lastName,
-        email,
-        password : hashPassword
-    })
-    response.body = await users.findOne({_id : insertId})
+// Register User
+export const Register = async ({request, response} : RouterContext<string>) => {
+    const {name, username, email, password} = await request.body().value;
+    const existUser = await users.findOne({username} || {email});
+    if(existUser){
+        response.status = 409;
+        response.body = {
+            message : "User allready exist"
+        }
+    }else{
+        const hashPassword = await bcrypt.hash(password)
+        const userId = await users.insertOne({
+            name,
+            username,
+            email,
+            password : hashPassword
+        })
+        const user = await users.findOne({_id : userId})
+        response.status = 200;
+        response.body = {
+            message : "Success Created",
+            user
+        }        
+    }
 }
-// deno-lint-ignore no-explicit-any
-export const Login = async({request, response, cookies} : RouterContext<any>) => {
-    const {email, password} = await request.body().value;
-    const user = await users.findOne({email});
+
+// Login User
+export const Login = async({request, response, cookies} : RouterContext<string>) => {
+    const {username, email, password} = await request.body().value;
+    const user = await users.findOne({username} || {email});
 
     if(!user) {
-        response.body = 404;
+        response.status = 404;
         response.body = {
             message : "User not found"
         }
         return;
     }
 
-    if(!await bcrypt.compare(password, user.password)){
-        response.body = 401;
+    const match = await bcrypt.compare(password, user.password)
+
+    if(!match){
+        response.status = 401;
         response.body = {
             message : "Incorrect password"
         }
         return
     }
 
-    const key = await crypto.subtle.generateKey(
-        { name: "HMAC", hash: "SHA-512" },
-        true,
-        ["sign", "verify"],
-      );
-    
-    const jwt = await create({ alg: "HS512", typ: "JWT" }, { _id: user._id }, key);
+    const payload = {
+        _id : user._id,
+        exp : getNumericDate(60*60)
+    }
 
+    const jwt = await create({ alg: "HS512", typ: "JWT" }, payload, "secret")
+    
     cookies.set('jwt', jwt, {httpOnly : true})
 
+    response.status = 200;
     response.body = {
-        message : "Success"
+        message : "Success Login",
+        token : jwt
     };
 }
 
-// deno-lint-ignore no-explicit-any
-// export const Me = async({response, cookies}: RouterContext<any>) => {
-//     const key = await crypto.subtle.generateKey(
-//         { name: "HMAC", hash: "SHA-512" },
-//         true,
-//         ["sign", "verify"],
-//       );
+// Get User authentication
+export const Profile = async({response, cookies}: RouterContext<string>) => {
+
+    const jwt = await cookies.get("jwt") || '';
+
+    if(!jwt) {
+        response.status = 401;
+        response.body = {
+            message : "Unauthorized"
+        }
+        return
+    }
     
-//     const jwt = cookies.get("jwt") || '';
-   
-//     if(!jwt) {
-//         response.body = 401;
-//         response.body = {
-//             message : "unauthenticated"
-//         }
-//     }
+    const payload = await verify(jwt, "secret", 'HS512')
     
-//     const payload = await verify(jwt, key, "HS512");
+    if(!payload) {
+        response.body = 401;
+        response.body = {
+            message : "unauthenticated"
+        }
+        return
+    }
 
-//     if(!payload) {
-//         response.body = 401;
-//         response.body = {
-//             message : "unauthenticated"
-//         }
-//     }
+    const {...userData} = await users.findOne({_id : new Bson.ObjectId(payload._id)});
+    response.status = 200;
+    response.body = userData;  
+}
 
-//     const {...userData} = await users.findOne({_id : new Bson.ObjectId(payload._id)});
-//     response.body = userData;  
-// }
-
-
-// export const Logout = async({response, cookies} : RouterContext<any>) => {
-//     cookies.delete("jwt");
-
-//     response.body = {
-//         message : "Success Logout",
-//     }
-// }
-
-// deno-lint-ignore no-explicit-any
+// Logout user
 export const Logout = ({response, cookies}:RouterContext<any>) => {
     cookies.delete("jwt");
     response.body = {
